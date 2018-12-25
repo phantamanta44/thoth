@@ -6,7 +6,6 @@ group 'xyz.phanta.thoth'
 version '1.0.0-SNAPSHOT'
 
 repositories {
-    mavenLocal()
     mavenCentral()
     maven {
         url 'https://jitpack.io/'
@@ -16,7 +15,7 @@ repositories {
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
     compile 'com.moandjiezana.toml:toml4j:0.7.2'
-    compile 'se.vidstige:jadb:1.1.0-SNAPSHOT'
+    compile 'com.github.vidstige:jadb:4546c0583f'
 }
 
 compileKotlin {

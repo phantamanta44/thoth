@@ -1,9 +1,6 @@
 # THOTH
 Android file synchronization tool over ADB
 
-## Building
-You'll need to locally install [JADB from here](https://github.com/phantamanta44/jadb) first. Then you can just use Gradle to build it like any other app.
-
 ## Usage
 First you'll want to create a `manifest.toml` file somewhere and give it two properties:
 
