@@ -3,7 +3,9 @@ package xyz.phanta.thoth.backend
 import javafx.beans.property.ObjectProperty
 import javafx.beans.property.SimpleObjectProperty
 
-abstract class DiffEntry(val path: GeneralPath, val delta: DiffDelta) {
+abstract class DiffEntry(val delta: DiffDelta) {
+
+    abstract val path: GeneralPath
 
     val resolution: ObjectProperty<DiffResolution> = SimpleObjectProperty(DiffResolution.NONE)
 
@@ -13,7 +15,7 @@ abstract class DiffEntry(val path: GeneralPath, val delta: DiffDelta) {
 
 }
 
-class FileDiffEntry(path: GeneralPath, delta: DiffDelta, private val parent: DiffEntry?) : DiffEntry(path, delta) {
+class FileDiffEntry(override val path: GeneralPathSized, delta: DiffDelta, private val parent: DiffEntry?) : DiffEntry(delta) {
 
     init {
         if (parent != null) {
@@ -31,7 +33,7 @@ class FileDiffEntry(path: GeneralPath, delta: DiffDelta, private val parent: Dif
 
 }
 
-class DirDiffEntry(path: GeneralPath, delta: DiffDelta, val children: List<DiffEntry>) : DiffEntry(path, delta) {
+class DirDiffEntry(override val path: GeneralPath, delta: DiffDelta, val children: List<DiffEntry>) : DiffEntry(delta) {
 
     init {
         resolution.addListener { _, _, value ->
@@ -50,7 +52,7 @@ class DirDiffEntry(path: GeneralPath, delta: DiffDelta, val children: List<DiffE
 
 enum class DiffResolution(val operatorStr: String) {
 
-    ACCEPT_LOCAL("<-"), ACCEPT_REMOTE("->"), HETEROGENEOUS(".."), NONE("//")
+    ACCEPT_LOCAL("->"), ACCEPT_REMOTE("<-"), HETEROGENEOUS(".."), NONE("//")
 
 }
 

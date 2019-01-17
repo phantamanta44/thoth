@@ -1,9 +1,8 @@
 package xyz.phanta.thoth.backend
 
-import se.vidstige.jadb.RemoteFile
 import java.nio.file.Path
 
-private val PATH_REGEX = Regex("""^[^"*/:<>?\\|&%]*$""")
+private val PATH_REGEX = Regex("""^[^"*/<>?\\|&%]*$""")
 
 open class GeneralPath(val segments: List<String>) {
 
@@ -12,14 +11,14 @@ open class GeneralPath(val segments: List<String>) {
     val isRoot: Boolean
         get() = segments.isEmpty()
 
-    constructor(path: String) : this(path.split('/'))
+    constructor(path: String) : this(splitSegments(path))
 
     constructor(path: Path) : this(path.map { it.toString() })
 
     init {
-        segments.forEach {
-            if (!it.matches(PATH_REGEX)) {
-                throw IllegalArgumentException("Bad path segment: $it")
+        segments.forEachIndexed { index, segment ->
+            if (!segment.matches(PATH_REGEX)) {
+                throw IllegalArgumentException("Bad path segment at index $index: $segment")
             }
         }
     }
@@ -28,11 +27,9 @@ open class GeneralPath(val segments: List<String>) {
 
     fun resolve(segment: String): GeneralPath = GeneralPath(segments + segment)
 
-    fun resolve(path: GeneralPath): GeneralPath = if (path is GeneralPathSized) {
-        GeneralPathSized(segments + path.segments, path.size)
-    } else {
-        GeneralPath(segments + path.segments)
-    }
+    fun resolve(path: GeneralPath): GeneralPath = GeneralPath(segments + path.segments)
+
+    fun resolve(path: GeneralPathSized): GeneralPathSized = GeneralPathSized(segments + path.segments, path.size)
 
     open fun relativize(root: GeneralPath): GeneralPath
             = GeneralPath(segments.subList(root.segments.size, segments.size))
@@ -41,29 +38,19 @@ open class GeneralPath(val segments: List<String>) {
 
     fun withSize(size: Long): GeneralPathSized = GeneralPathSized(segments, size)
 
-    open fun toRemote(): RemoteFile = RemoteFile(toString())
-
     override fun toString(): String = segments.joinToString("/")
 
 }
 
 class GeneralPathSized(segments: List<String>, val size: Long) : GeneralPath(segments) {
 
-    constructor(path: String, size: Long) : this(path.split('/'), size)
+    constructor(path: String, size: Long) : this(splitSegments(path), size)
 
     constructor(path: Path, size : Long) : this(path.map { it.toString() }, size)
 
-    override fun relativize(root: GeneralPath): GeneralPath
+    override fun relativize(root: GeneralPath): GeneralPathSized
             = GeneralPathSized(segments.subList(root.segments.size, segments.size), size)
 
-    override fun toRemote(): RemoteFile = RemoteFileSized(this)
-
 }
 
-private class RemoteFileSized(path: GeneralPathSized) : RemoteFile(path.toString()) {
-
-    private val providedSize: Long = path.size
-
-    override fun getSize(): Int = providedSize.toInt()
-
-}
+private fun splitSegments(path: String): List<String> = path.split('/', '\\')

@@ -1,11 +1,10 @@
 package xyz.phanta.thoth.backend
 
-import se.vidstige.jadb.RemoteFile
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.stream.Collectors
 
-abstract class LibraryIndexNode(val path: GeneralPath, val modifyTime: Long) {
+abstract class LibraryIndexNode(val modifyTime: Long) {
 
     companion object {
 
@@ -19,18 +18,21 @@ abstract class LibraryIndexNode(val path: GeneralPath, val modifyTime: Long) {
             LibraryIndexFileNode(GeneralPathSized(path, Files.size(path)).relativize(root), Files.getLastModifiedTime(path).toMillis())
         }
 
-        fun walkRemote(device: AdbOperator, path: RemoteFile, root: GeneralPath, parent: GeneralPath): LibraryIndexNode {
-            val childPath = parent.resolve(path.path)
-            return if (path.isDirectory) {
-                LibraryIndexDirNode(childPath, path.lastModified, device.list(root.resolve(childPath))
-                    .filter { isValidPath(it.path) }
-                    .associate { it.path to walkRemote(device, it, root, childPath) })
+        fun <F>walkRemote(device: RemoteOperator<F>, path: F, root: GeneralPath, parent: GeneralPath): LibraryIndexNode {
+            val childPath = parent.resolve(device.fileNameOf(path))
+            return if (device.isDirectory(path)) {
+                LibraryIndexDirNode(childPath, device.modifyTimeOf(path), device.list(root.resolve(childPath))
+                    .map { device.fileNameOf(it) to it }
+                    .filter { isValidPath(it.first) }
+                    .associate { it.first to walkRemote(device, it.second, root, childPath) })
             } else {
-                LibraryIndexFileNode(childPath.withSize(path.size.toLong()), path.lastModified)
+                LibraryIndexFileNode(childPath.withSize(device.sizeOf(path)), device.modifyTimeOf(path))
             }
         }
 
     }
+
+    abstract val path: GeneralPath
 
     abstract fun calculateDiff(index: LibraryIndexNode, parent: DiffEntry?): DiffEntry?
 
@@ -38,7 +40,7 @@ abstract class LibraryIndexNode(val path: GeneralPath, val modifyTime: Long) {
 
 }
 
-class LibraryIndexFileNode(path: GeneralPath, modifyTime: Long) : LibraryIndexNode(path, modifyTime) {
+class LibraryIndexFileNode(override val path: GeneralPathSized, modifyTime: Long) : LibraryIndexNode(modifyTime) {
 
     override fun calculateDiff(index: LibraryIndexNode, parent: DiffEntry?): DiffEntry? {
 //        val remoteTime = (index as LibraryIndexFileNode).modifyTime
@@ -60,8 +62,8 @@ class LibraryIndexFileNode(path: GeneralPath, modifyTime: Long) : LibraryIndexNo
 
 }
 
-class LibraryIndexDirNode(path: GeneralPath, modifyTime: Long, private val children: Map<String, LibraryIndexNode>) :
-    LibraryIndexNode(path, modifyTime) {
+class LibraryIndexDirNode(override val path: GeneralPath, modifyTime: Long, private val children: Map<String, LibraryIndexNode>) :
+    LibraryIndexNode(modifyTime) {
 
     override fun calculateDiff(index: LibraryIndexNode, parent: DiffEntry?): DiffEntry? {
         val dirIndex = index as LibraryIndexDirNode

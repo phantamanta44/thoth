@@ -35,7 +35,7 @@ class MainApp : Application() {
     private val busy: SimpleBooleanProperty = SimpleBooleanProperty(true)
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
 
-    private var engine: SyncEngine? = null
+    private var engine: SyncEngine<*>? = null
 
     val propDiffExists: ReadOnlyBooleanProperty
         get() = diffExists
@@ -68,9 +68,10 @@ class MainApp : Application() {
 
             // scan for connected devices
             println("Scanning for devices...")
-            mainWindow.onDevicesConnected(jadb.devices)
+            mainWindow.onDevicesConnected(jadb.devices.map { AdbTarget(it) } + FileSystemTarget())
             jadb.createDeviceWatcher(object : DeviceDetectionListener {
-                override fun onDetect(devices: MutableList<JadbDevice>) = mainWindow.onDevicesConnected(devices)
+                override fun onDetect(devices: MutableList<JadbDevice>)
+                        = mainWindow.onDevicesConnected(devices.map { AdbTarget(it) })
 
                 override fun onException(e: Exception) {
                     // NO-OP
@@ -87,7 +88,7 @@ class MainApp : Application() {
 
     fun getManifest(): LibraryManifest = manifest
 
-    fun setActiveDevice(device: JadbDevice?) {
+    fun setActiveDevice(device: RemoteTarget?) {
         diffExists.value = false
         if (device == null) {
             Alert(Alert.AlertType.ERROR, "No device selected!", ButtonType.OK).show()
@@ -97,7 +98,7 @@ class MainApp : Application() {
                 println("Building local index...")
                 localIndex = LibraryIndexNode.walkLocal(manifest.local, GeneralPath(manifest.local))
 
-                engine = SyncEngine(device, manifest).also {
+                engine = SyncEngine(device.createOperator(), manifest).also {
                     it.buildDiffTree(localIndex).let { diffRoot ->
                         if (diffRoot != null) {
                             Platform.runLater {

@@ -1,7 +1,10 @@
-package xyz.phanta.thoth.backend
+package xyz.phanta.thoth.backend.operator
 
 import se.vidstige.jadb.JadbDevice
 import se.vidstige.jadb.RemoteFile
+import xyz.phanta.thoth.backend.GeneralPath
+import xyz.phanta.thoth.backend.GeneralPathSized
+import xyz.phanta.thoth.backend.RemoteOperator
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeoutException
@@ -9,7 +12,7 @@ import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
 
-class AdbOperator(private val device: JadbDevice) {
+class AdbOperator(private val device: JadbDevice) : RemoteOperator<RemoteFile> {
 
     companion object {
 
@@ -17,49 +20,57 @@ class AdbOperator(private val device: JadbDevice) {
 
     }
 
-    val serial: String
-        get() = device.serial
+    override val identifier: String
+        get() = "adb:${device.serial}"
 
-    fun list(path: GeneralPath): List<RemoteFile> = device.list(path.toString())
+    override fun list(path: GeneralPath): List<RemoteFile> = device.list(path.toString())
 
-    fun fileExists(path: GeneralPath) = list(path.parent()).any { it.path == path.fileName }
+    override fun fileExists(path: GeneralPath): Boolean = list(path.parent()).any { it.path == path.fileName }
 
-    fun rmFile(path: GeneralPath) = execute({ unsafeRmFile(path) })
+    override fun sizeOf(file: RemoteFile): Long = file.size.toLong()
+
+    override fun modifyTimeOf(file: RemoteFile): Long = file.lastModified
+
+    override fun fileNameOf(file: RemoteFile): String = file.path
+
+    override fun isDirectory(file: RemoteFile): Boolean = file.isDirectory
+
+    override fun rmFile(path: GeneralPath) = execute({ unsafeRmFile(path) })
 
     private fun unsafeRmFile(path: GeneralPath) {
         device.execute("rm", "-f", path.toString())
     }
 
-    fun mkDir(path: GeneralPath) = execute({ unsafeMkDir(path) })
+    override fun mkDir(path: GeneralPath) = execute({ unsafeMkDir(path) })
 
     private fun unsafeMkDir(path: GeneralPath) {
         device.execute("mkdir", "-p", path.toString())
     }
 
-    fun rmDir(path: GeneralPath) = execute({ unsafeRmDir(path) })
+    override fun rmDir(path: GeneralPath) = execute({ unsafeRmDir(path) })
 
     private fun unsafeRmDir(path: GeneralPath) {
         device.execute("rm", "-rf", path.toString())
     }
 
-    fun pull(from: RemoteFile, to: Path) = execute({
+    override fun pull(from: GeneralPathSized, to: Path) = execute({
         unsafePull(from, to)
     }, {
         Files.delete(to)
-    }, timeoutFor(from.size.toLong()))
+    }, timeoutFor(from.size))
 
-    private fun unsafePull(from: RemoteFile, to: Path) {
-        device.pull(from, to.toFile())
+    private fun unsafePull(from: GeneralPathSized, to: Path) {
+        device.pull(RemoteFile(from.toString()), to.toFile())
     }
 
-    fun push(from: Path, to: RemoteFile) = execute({
+    override fun push(from: Path, to: GeneralPathSized) = execute({
         unsafePush(from, to)
     }, {
-        device.execute("rm", "-f", to.path)
+        device.execute("rm", "-f", to.toString())
     }, timeoutFor(Files.size(from)))
 
-    private fun unsafePush(from: Path, to: RemoteFile) {
-        device.push(from.toFile(), to)
+    private fun unsafePush(from: Path, to: GeneralPathSized) {
+        device.push(from.toFile(), RemoteFile(to.toString()))
     }
 
     private fun timeoutFor(bytes: Long): Long = bytes / 100L

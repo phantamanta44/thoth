@@ -10,8 +10,8 @@ import javafx.scene.layout.VBox
 import javafx.scene.paint.Color
 import javafx.util.Callback
 import javafx.util.StringConverter
-import se.vidstige.jadb.JadbDevice
 import xyz.phanta.thoth.application.MainApp
+import xyz.phanta.thoth.application.RemoteTarget
 import xyz.phanta.thoth.backend.*
 import java.nio.file.Path
 import java.util.concurrent.Callable
@@ -19,7 +19,7 @@ import java.util.concurrent.Callable
 class MainWindowController(private val app: MainApp) {
 
     @FXML
-    private lateinit var deviceList: ChoiceBox<JadbDevice>
+    private lateinit var deviceList: ChoiceBox<RemoteTarget>
     @FXML
     private lateinit var btnDiff: Button
     @FXML
@@ -33,10 +33,10 @@ class MainWindowController(private val app: MainApp) {
 
     @FXML
     fun initialize() {
-        deviceList.converter = object : StringConverter<JadbDevice>() {
-            override fun toString(device: JadbDevice): String = device.serial
+        deviceList.converter = object : StringConverter<RemoteTarget>() {
+            override fun toString(device: RemoteTarget): String = device.identifier
 
-            override fun fromString(deviceName: String): JadbDevice = deviceList.items.first { it.serial == deviceName }
+            override fun fromString(deviceName: String): RemoteTarget = deviceList.items.first { it.identifier == deviceName }
         }
         fileTree.columns[0].cellFactory = Callback { LocalDiffCell(app.getManifest().local) }
         fileTree.columns[1].cellFactory = Callback { RemoteDiffCell(app.getManifest().remote) }
@@ -62,7 +62,7 @@ class MainWindowController(private val app: MainApp) {
         app.performSync()
     }
 
-    fun onDevicesConnected(device: List<JadbDevice>) {
+    fun onDevicesConnected(device: List<RemoteTarget>) {
         deviceList.items.addAll(device)
     }
 

@@ -2,8 +2,8 @@ package xyz.phanta.thoth.backend
 
 import com.moandjiezana.toml.Toml
 import java.io.File
-import java.nio.file.FileSystems
 import java.nio.file.Path
+import java.nio.file.Paths
 
 class LibraryManifest private constructor(mf: Toml) {
 
@@ -27,7 +27,7 @@ class LibraryManifest private constructor(mf: Toml) {
     init {
         mf.getString("local").let {
             if (it == null) throw NoSuchElementException("No local dir specified!")
-            local = FileSystems.getDefault().getPath(it)
+            local = Paths.get(it)
         }
         mf.getString("remote").let {
             if (it == null) throw NoSuchElementException("No remote dir specified!")

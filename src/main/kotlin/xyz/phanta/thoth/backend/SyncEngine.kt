@@ -1,27 +1,25 @@
 package xyz.phanta.thoth.backend
 
-import se.vidstige.jadb.JadbDevice
 import java.nio.file.Files
 import kotlin.system.measureTimeMillis
 
-class SyncEngine(device: JadbDevice, private val manifest: LibraryManifest) {
-
-    private val operator: AdbOperator = AdbOperator(device)
+class SyncEngine<F>(private val operator: RemoteOperator<F>, private val manifest: LibraryManifest) {
 
     private lateinit var index: LibraryIndexNode
     private var diffTree: DiffEntry? = null
 
     private fun scanRemote() {
         index = LibraryIndexDirNode(manifest.remote, -1, operator.list(manifest.remote)
-            .filter { isValidPath(it.path) }
+            .map { operator.fileNameOf(it) to it }
+            .filter { isValidPath(it.first) }
             .associate {
-                it.path to LibraryIndexNode.walkRemote(operator, it, manifest.remote, GeneralPath(listOf()))
+                it.first to LibraryIndexNode.walkRemote(operator, it.second, manifest.remote, GeneralPath(listOf()))
             })
     }
 
     fun buildDiffTree(localIndex: LibraryIndexNode): DiffEntry? {
         val scanTime = measureTimeMillis {
-            println("Scanning device ${operator.serial}...")
+            println("Scanning device ${operator.identifier}...")
             scanRemote()
             println("Building diff tree...")
             diffTree = localIndex.calculateDiff(index, null)
@@ -42,8 +40,7 @@ class SyncEngine(device: JadbDevice, private val manifest: LibraryManifest) {
                         DiffResolution.ACCEPT_LOCAL -> {
                             if (Files.exists(local)) {
                                 println("Pushing local to remote")
-                                operator.push(it.path.resolveAgainst(manifest.local),
-                                    manifest.remote.resolve(it.path).toRemote())
+                                operator.push(it.path.resolveAgainst(manifest.local), manifest.remote.resolve(it.path))
                             } else {
                                 println("Destroying remote")
                                 operator.rmFile(manifest.remote.resolve(it.path))
@@ -54,7 +51,7 @@ class SyncEngine(device: JadbDevice, private val manifest: LibraryManifest) {
                                 println("Pulling remote to local")
                                 val localPath = it.path.resolveAgainst(manifest.local)
                                 Files.createDirectories(localPath.parent)
-                                operator.pull(manifest.remote.resolve(it.path).toRemote(), localPath)
+                                operator.pull(manifest.remote.resolve(it.path), localPath)
                             } else {
                                 println("Destroying local")
                                 Files.deleteIfExists(it.path.resolveAgainst(manifest.local))
