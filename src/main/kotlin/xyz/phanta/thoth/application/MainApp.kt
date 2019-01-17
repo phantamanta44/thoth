@@ -18,6 +18,9 @@ import xyz.phanta.thoth.backend.GeneralPath
 import xyz.phanta.thoth.backend.LibraryIndexNode
 import xyz.phanta.thoth.backend.LibraryManifest
 import xyz.phanta.thoth.backend.SyncEngine
+import java.time.ZoneOffset
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.system.measureTimeMillis
@@ -40,6 +43,7 @@ class MainApp : Application() {
         get() = busy
 
     override fun start(root: Stage) {
+        println("Starting app at ${ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT)}")
         val initTime = measureTimeMillis {
             // parse manifest
             println("Parsing manifest...")

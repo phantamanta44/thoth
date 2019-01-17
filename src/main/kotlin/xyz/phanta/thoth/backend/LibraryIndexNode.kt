@@ -1,6 +1,5 @@
 package xyz.phanta.thoth.backend
 
-import se.vidstige.jadb.JadbDevice
 import se.vidstige.jadb.RemoteFile
 import java.nio.file.Files
 import java.nio.file.Path
@@ -17,17 +16,17 @@ abstract class LibraryIndexNode(val path: GeneralPath, val modifyTime: Long) {
                     .collect(Collectors.toMap({ it.fileName.toString() }) { walkLocal(it, root) })
             )
         } else {
-            LibraryIndexFileNode(GeneralPath(path).relativize(root), Files.getLastModifiedTime(path).toMillis())
+            LibraryIndexFileNode(GeneralPathSized(path, Files.size(path)).relativize(root), Files.getLastModifiedTime(path).toMillis())
         }
 
-        fun walkRemote(device: JadbDevice, path: RemoteFile, root: GeneralPath, parent: GeneralPath): LibraryIndexNode {
+        fun walkRemote(device: AdbOperator, path: RemoteFile, root: GeneralPath, parent: GeneralPath): LibraryIndexNode {
             val childPath = parent.resolve(path.path)
             return if (path.isDirectory) {
-                LibraryIndexDirNode(childPath, path.lastModified, device.list(root.resolve(childPath).toString())
+                LibraryIndexDirNode(childPath, path.lastModified, device.list(root.resolve(childPath))
                     .filter { isValidPath(it.path) }
                     .associate { it.path to walkRemote(device, it, root, childPath) })
             } else {
-                LibraryIndexFileNode(childPath, path.lastModified)
+                LibraryIndexFileNode(childPath.withSize(path.size.toLong()), path.lastModified)
             }
         }
 

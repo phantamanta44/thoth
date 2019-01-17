@@ -15,7 +15,7 @@ repositories {
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
     compile 'com.moandjiezana.toml:toml4j:0.7.2'
-    compile 'com.github.vidstige:jadb:4546c0583f'
+    compile 'com.github.vidstige:jadb:6876adc9df'
 }
 
 compileKotlin {

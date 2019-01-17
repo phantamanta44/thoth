@@ -1,31 +1,27 @@
 package xyz.phanta.thoth.backend
 
 import se.vidstige.jadb.JadbDevice
-import se.vidstige.jadb.RemoteFile
 import java.nio.file.Files
 import kotlin.system.measureTimeMillis
 
-class SyncEngine(private val device: JadbDevice, private val manifest: LibraryManifest) {
+class SyncEngine(device: JadbDevice, private val manifest: LibraryManifest) {
+
+    private val operator: AdbOperator = AdbOperator(device)
 
     private lateinit var index: LibraryIndexNode
     private var diffTree: DiffEntry? = null
 
     private fun scanRemote() {
-        index = LibraryIndexDirNode(manifest.remote, -1, device.list(manifest.remote.toString())
+        index = LibraryIndexDirNode(manifest.remote, -1, operator.list(manifest.remote)
             .filter { isValidPath(it.path) }
             .associate {
-                it.path to LibraryIndexNode.walkRemote(
-                    device,
-                    it,
-                    manifest.remote,
-                    GeneralPath(listOf())
-                )
+                it.path to LibraryIndexNode.walkRemote(operator, it, manifest.remote, GeneralPath(listOf()))
             })
     }
 
     fun buildDiffTree(localIndex: LibraryIndexNode): DiffEntry? {
         val scanTime = measureTimeMillis {
-            println("Scanning device ${device.serial}...")
+            println("Scanning device ${operator.serial}...")
             scanRemote()
             println("Building diff tree...")
             diffTree = localIndex.calculateDiff(index, null)
@@ -46,24 +42,19 @@ class SyncEngine(private val device: JadbDevice, private val manifest: LibraryMa
                         DiffResolution.ACCEPT_LOCAL -> {
                             if (Files.exists(local)) {
                                 println("Pushing local to remote")
-                                device.push(
-                                    it.path.resolveAgainst(manifest.local).toFile(),
-                                    RemoteFile(manifest.remote.resolve(it.path).toString())
-                                )
+                                operator.push(it.path.resolveAgainst(manifest.local),
+                                    manifest.remote.resolve(it.path).toRemote())
                             } else {
                                 println("Destroying remote")
-                                device.execute("rm", manifest.remote.resolve(it.path).toString())
+                                operator.rmFile(manifest.remote.resolve(it.path))
                             }
                         }
                         DiffResolution.ACCEPT_REMOTE -> {
-                            if (device.fileExists(remote)) {
+                            if (operator.fileExists(remote)) {
                                 println("Pulling remote to local")
                                 val localPath = it.path.resolveAgainst(manifest.local)
                                 Files.createDirectories(localPath.parent)
-                                device.pull(
-                                    RemoteFile(manifest.remote.resolve(it.path).toString()),
-                                    localPath.toFile()
-                                )
+                                operator.pull(manifest.remote.resolve(it.path).toRemote(), localPath)
                             } else {
                                 println("Destroying local")
                                 Files.deleteIfExists(it.path.resolveAgainst(manifest.local))
@@ -83,14 +74,14 @@ class SyncEngine(private val device: JadbDevice, private val manifest: LibraryMa
                         DiffResolution.ACCEPT_LOCAL -> {
                             if (Files.exists(local)) {
                                 println("Creating remote dir")
-                                device.execute("mkdir", "-p", manifest.remote.resolve(it.path).toString())
+                                operator.mkDir(manifest.remote.resolve(it.path))
                             } else {
                                 println("Destroying remote dir")
-                                device.execute("rm", "-rf", manifest.remote.resolve(it.path).toString())
+                                operator.rmDir(manifest.remote.resolve(it.path))
                             }
                         }
                         DiffResolution.ACCEPT_REMOTE -> {
-                            if (device.fileExists(remote)) {
+                            if (operator.fileExists(remote)) {
                                 println("Creating local dir")
                                 Files.createDirectories(it.path.resolveAgainst(manifest.local))
                             } else {
@@ -111,5 +102,3 @@ class SyncEngine(private val device: JadbDevice, private val manifest: LibraryMa
 }
 
 fun isValidPath(path: String) = path != "." && path != ".."
-
-fun JadbDevice.fileExists(path: GeneralPath) = list(path.parent().toString()).any { it.path == path.fileName }
