@@ -11,6 +11,7 @@ import java.util.concurrent.TimeoutException
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
+import kotlin.concurrent.withLock
 
 class AdbOperator(private val device: JadbDevice) : RemoteOperator<RemoteFile> {
 
@@ -76,28 +77,28 @@ class AdbOperator(private val device: JadbDevice) : RemoteOperator<RemoteFile> {
     private fun timeoutFor(bytes: Long): Long = bytes / 100L
 
     private fun execute(action: JadbDevice.() -> Unit, failureCallback: (JadbDevice.() -> Unit)? = null, timeout: Long = 3000L) {
-        lock.lockInterruptibly()
-        try {
-            val adbThread = thread(name = "ADB Operator") { action(device) }
-            adbThread.join(timeout)
-            if (adbThread.isAlive) {
-                @Suppress("DEPRECATION")
-                adbThread.stop()
-                throw TimeoutException("Operation timed out!")
-            }
-        } catch (e: Throwable) {
-            println("ADB operation raised exception!")
-            e.printStackTrace(System.out)
-            failureCallback?.let {
-                try {
-                    it(device)
-                } catch (e: Throwable) {
-                    println("Failure callback raised exception! Uh oh.")
-                    e.printStackTrace(System.out)
+        lock.withLock {
+            try {
+                val adbThread = thread(name = "ADB Operator") { action(device) }
+                adbThread.join(timeout)
+                if (adbThread.isAlive) {
+                    @Suppress("DEPRECATION")
+                    adbThread.stop()
+                    throw TimeoutException("Operation timed out!")
+                }
+                return
+            } catch (e: Throwable) {
+                println("ADB operation raised exception!")
+                e.printStackTrace(System.out)
+                failureCallback?.let {
+                    try {
+                        it(device)
+                    } catch (e: Throwable) {
+                        println("Failure callback raised exception! Uh oh.")
+                        e.printStackTrace(System.out)
+                    }
                 }
             }
-        } finally {
-            lock.unlock()
         }
     }
 
